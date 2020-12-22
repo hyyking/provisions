@@ -1,0 +1,268 @@
+---
+title: "Provisionnement Dommage"
+author: "Julia Simaku & Ismail Bengrina"
+date: "5/19/2019"
+output: html_document
+---
+
+
+Packages à utiliser 
+```{r}
+install.packages("ChainLadder")
+install.packages("gdata")
+# package utilisé pour soustraire l'année
+install.packages("lubridate") 
+library(lubridate)
+library(ChainLadder)
+library(CASdatasets)
+library(gdata)
+```
+
+Importation de la base 
+```{r}
+base_etude <- read.csv(file="freclaimset3dam9207.csv")
+```
+
+Composition de la base 
+```{r}
+base_etude <-as.data.frame(base_etude)
+summary(base_etude)
+```
+
+#### Creation des triangles ####
+
+Creation de la variable annee d'occurence
+```{r}
+base_etude$annee_occur <-year(base_etude$OccurDate)
+```
+
+Creation de la table INCURRED et triangle incurred
+```{r}
+base_incur <- subset(base_etude, select = c(annee_occur,inc_Y15,inc_Y14,inc_Y13,inc_Y12,inc_Y11,inc_Y10,inc_Y9,inc_Y8,inc_Y7,inc_Y6,inc_Y5,inc_Y4,inc_Y3,inc_Y2,inc_Y1,inc_Y0))
+incur <-aggregate(base_incur, by=list(Category=base_incur$annee_occur),FUN=sum)
+colnames(incur)[colnames(incur)=="Category"] <- "an_occur"
+
+row.names(incur)=c("1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007")
+ incur<-incur[,c(-1,-2)]
+colnames(incur)=c("Y0","Y1","Y2","Y3","Y4","Y5","Y6","Y7","Y8","Y9","Y10","Y11","Y12","Y13","Y14","Y15")
+
+#construction de la matrice selon les annees de developpement
+
+construct_triangle_incur <-matrix(NA, nrow = 16, ncol = 16)
+for(j in 1:16)
+for(i in 1:16)
+  construct_triangle_incur[i,j-i+1] <-incur[i,j]
+round(construct_triangle_incur)
+
+row.names(construct_triangle_incur)=c("1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007")
+colnames(construct_triangle_incur)=c(1:16)
+
+
+names(attributes(construct_triangle_incur)[[2]])<-"origin"
+names(attributes(construct_triangle_incur)[[2]])[is.na(names(attributes(construct_triangle_incur)[[2]]))] <- "dev"
+str(construct_triangle_incur)
+construct_triangle_incur <- replace(construct_triangle_incur,construct_triangle_incur==0,NA)
+
+triangle_incur <- as.triangle(construct_triangle_incur, origin="origin", dev="dev")
+plot(triangle_incur)
+```
+
+
+Creation de la base PAID et triangle paid
+```{r}
+
+base_paid <- subset(base_etude, select = c(annee_occur,paid_Y15,paid_Y14,paid_Y13,paid_Y12,paid_Y11,paid_Y10,paid_Y9,paid_Y8,paid_Y7,paid_Y6,paid_Y5,paid_Y4,paid_Y3,paid_Y2,paid_Y1,paid_Y0))
+paid <- aggregate(base_paid,by=list(Category=base_paid$annee_occur),FUN=sum)
+colnames(paid)[colnames(paid)=="Category"] <- "an_occur"
+
+row.names(paid)=c("1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007")
+paid <-paid[,c(-1,-2)]
+colnames(paid)=c("Y0","Y1","Y2","Y3","Y4","Y5","Y6","Y7","Y8","Y9","Y10","Y11","Y12","Y13","Y14","Y15")
+
+# construction du triangle respectant les annees de developpement 
+
+construct_triangle <-matrix(NA, nrow = 16, ncol = 16)
+for(j in 1:16)
+for(i in 1:16)
+  construct_triangle[i,j-i+1] <-paid[i,j]
+round(construct_triangle)
+
+row.names(construct_triangle)=c("1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007")
+colnames(construct_triangle)=c(1:16)
+
+str(construct_triangle)
+names(attributes(construct_triangle)[[2]])<-"origin"
+names(attributes(construct_triangle)[[2]])[is.na(names(attributes(construct_triangle)[[2]]))] <- "dev"
+str(construct_triangle)
+construct_triangle <- replace(construct_triangle,construct_triangle==0,NA)
+
+triangle_paid <- as.triangle(construct_triangle, origin="origin", dev="dev")
+plot(triangle_paid)
+```
+
+
+#### Méthodes déterministes ####
+
+#### Chain-Ladder ####
+
+Calcul des facteurs de developpement (estimation des sinistres)
+```{r}
+ata(triangle_incur)
+facteurs_incur <- attr(ata(triangle_incur), "vwtd")
+```
+
+Calcul des facteurs de developpement (paiements)
+```{r}
+ata(triangle_paid)
+# recuperation des link-ratios ponderés
+facteurs_paid <- attr(ata(triangle_paid), "vwtd")
+```
+
+
+Prediction pour la partie inferieur du triangle
+```{r}
+trianglecf <- triangle_paid 
+for(k in 1:15)
+  trianglecf[(16-k+1):16, k+1] <- trianglecf[(16-k+1):16, k]*facteurs_paid[k] 
+round(trianglecf)
+```
+
+Calcul de la reserve
+```{r}
+fult <- c(rev(cumprod(rev(facteurs_paid))), 1)
+lastclaim <- diag(trianglecf[, 16:1])
+cbind(ultim=lastclaim* rev(fult), ultim2=trianglecf[,16],prov=lastclaim * (rev(fult) - 1))
+```
+
+Autre fonction pour calculer les link ratios
+```{r}
+sapply(chainladder(triangle_paid)$Model, coef)
+plot(sapply(chainladder(triangle_paid)$Model, coef))
+```
+
+#### London-Chain ####
+
+Fonction qui permet le calcul de la reserve via London-Chain
+```{r}
+
+LC=function(triangle){
+    n=dim(triangle)[1]
+    lambda=0
+    beta=0
+    for(j in 0:(n-2)){
+        Cj_bar0=mean(triangle[1:(n-j-1),j+1])
+        Cj_bar1=mean(triangle[1:(n-j-1),j+2])
+        num=mean(triangle[1:(n-j-1),j+1]*triangle[1:(n-j-1),j+2])-Cj_bar0*Cj_bar1
+        denom=mean(triangle[1:(n-j-1),j+1]^2)-Cj_bar0^2
+        lambda[j+1]=num/denom
+        beta[j+1]=Cj_bar1-lambda[j+1]*Cj_bar0
+    }
+    lambda[n-1]=Cj_bar1/Cj_bar0
+    beta[n-1]=0
+    M_cumule=triangle
+    for(j in 1:(n-1)){
+        for(i in (n+1-j):n){
+            M_cumule[i,j+1]=M_cumule[i,j]*lambda[j]+beta[j]
+        }
+    }
+    prov_LC=0
+    for(i in 2:n){
+        prov_LC[i]=M_cumule[i,n]-M_cumule[i,(n+1-i)]
+    }
+    return(list(lambda_LC=lambda,beta_LC=beta,M_cumule=M_cumule,prov_LC_an=prov_LC,prov_LC=sum(prov_LC)))
+}
+
+LC(triangle = construct_triangle)
+```
+
+#### Méthodes Stochastiques ####
+
+#### Methode de Mac ####
+```{r}
+triangle_paid.MCL <- MackChainLadder(triangle_paid, est.sigma="Mack")
+summary(triangle_paid.MCL)
+
+plot(triangle_paid.MCL, mfrow=c(2,3))
+```
+
+#### Bootstrap ####
+```{r}
+triangle_paid.BCL <- BootChainLadder(triangle_paid, 1000, "od.pois")
+summary(triangle_paid.BCL)
+plot(triangle_paid.BCL)
+```
+
+#### GLM ####
+```{r}
+triangle_paid2<-cum2incr(triangle_paid)
+triangle_paid2 <- as.data.frame(triangle_paid2)
+triangle_paid2$dev <- paste0("D", triangle_paid2$dev)
+triangle_paid2$value[triangle_paid2$value <0 ] <-0
+
+glmopois <- glm(value ~ origin + dev, quasipoisson("log"), data=triangle_paid2)
+head(model.matrix(glmopois), 20)
+summary(glmopois)
+
+n<-16
+getfulltri <- function(mod)
+{
+coefs <- exp(as.numeric(coef(mod)))
+alpha <- c(1, coefs[2:n])
+beta <- c(1, coefs[(n+1):(2*n-1)])
+X <- coefs[1] * alpha %*% t(beta)
+colnames(X) <- 1:n
+rownames(X) <- levels(mod$data$origin)
+X
+}
+incr2cum(getfulltri(glmopois))
+resultats <- as.data.frame(incr2cum(getfulltri(glmopois))[,16])
+```
+
+```{r}
+install.packages("sn")
+library(sn)
+
+#utilisation
+dmsn(x, xi=rep(0,length(alpha)), Omega, alpha, tau=0, dp=NULL, log=FALSE)
+pmsn(x, xi=rep(0,length(alpha)), Omega, alpha,  tau=0, dp=NULL, ...)
+rmsn(n=1, xi=rep(0,length(alpha)), Omega, alpha,  tau=0, dp=NULL)
+
+x <- seq(-3,3,length=15)
+xi <- c(0.5, -1)
+Omega <- diag(2)
+Omega[2,1] <- Omega[1,2] <- 0.5
+alpha <- c(2,-6)
+pdf <- dmsn(cbind(x, 2*x-1), xi, Omega, alpha)
+cdf <- pmsn(cbind(x, 2*x-1), xi, Omega, alpha)
+p1 <- pmsn(c(2,1), xi, Omega, alpha)
+p2 <- pmsn(c(2,1), xi, Omega, alpha, abseps=1e-12, maxpts=10000)
+#
+rnd <- rmsn(10, xi, Omega, alpha)
+#
+# use OP parameters to fix marginal shapes at given lambda values:
+op <- list(xi=c(0,1), Psi=matrix(c(2,2,2,3), 2, 2), lambda=c(5, -2))
+rnd <- rmsn(10, dp=op2dp(op,"SN"))
+# 
+# use CP parameters to fix mean vector, variance matrix and marginal skewness:
+cp <- list(mean=c(0,0), var.cov=matrix(c(3,2,2,3)/3, 2, 2), gamma1=c(0.8, 0.4))
+dp <- cp2dp(cp, "SN")
+rnd <- rmsn(5, dp=dp)
+```
+
+```{r}
+# determination de alpha, omega et tau pour alimenter la distribution msn
+```
+
+Preparation de la base 
+```{r}
+# determinons les annees d'ajustement d'estimation de sinistre.
+
+for (m in 1:109992) 
+  for (n in 1:17) 
+    if ()
+  }
+  
+}
+```
+
+
