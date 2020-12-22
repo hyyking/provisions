@@ -29,7 +29,7 @@ def reserve(table) -> list:
 
 
 
-def london_chain_coefs(table):
+def london_chain_coefs(table) -> list:
     coefs = []
     cols = len(table.columns)
     # compute N-2 terms
@@ -55,6 +55,20 @@ def london_chain_fill(table, lambdas) -> pd.DataFrame:
         currp[currp.isna()] = alpha + l * prevp[currp.isna()]
     return table
 
+def bf_gammas(table) -> list:
+    return (table.iloc[0] / table.iloc[0, -1]).values
+
+def bf_fill(table, sp, primes, gammas):
+    size = len(table.index)
+    for i in range(1, size):
+        currl = table.iloc[i] 
+        lidx = size - i - 1
+        lg = gammas[lidx] # gamma of last value
+        lv = currl[lidx] # last value
+
+        for j in range(size - i, size):
+            currl[j] = lv + (gammas[j] - lg) * sp * primes.iloc[i]
+    return table
 
 if __name__ == "__main__":
     def chain_ladder():
@@ -73,4 +87,14 @@ if __name__ == "__main__":
         print(filled)
         res = reserve(filled)
         print(sum(res))
-    london_chain()
+    # london_chain()
+
+    def bf():
+        gammas = bf_gammas(donnee.BDG)
+        print(gammas)
+        filled = bf_fill(donnee.BDG.copy(deep=True), 0.97, donnee.PRIMES, gammas)
+        print(filled)
+        res = reserve(filled)
+        print(sum(res))
+    bf()
+
