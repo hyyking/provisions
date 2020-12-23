@@ -24,15 +24,15 @@ def chain_ladder_fill(table: pd.DataFrame, lambdas: list) -> pd.DataFrame:
 
 # -------------------------------------------------------------------------------
 
-
 def london_chain_coefs(table: pd.DataFrame) -> list:
     """ compute london chain regression coefficients """
     coefs = []
     size = len(table.columns)
     # compute N-2 terms
     for i in range(size - 2):
-        currp = table[i][table[i + 1].notna()]  # mask the overlapping lines
-        nextp = table[i + 1].dropna()  # match the previous length
+        nextp = table[i + 1]
+        currp = table[i].loc[nextp.notna()]  # mask the overlapping lines
+        nextp.dropna(inplace=True)
 
         beta = currp.cov(nextp) / currp.var()
         alpha = nextp.mean() - beta * currp.mean()
@@ -41,15 +41,15 @@ def london_chain_coefs(table: pd.DataFrame) -> list:
     # compute N - 1
     # we set alpha = 0
     # so lambda = avg(S_n) / avg(S_n-1) = S_n / S_n-1 (single term in both)
-    coefs.append((table[size - 1][0] / table[size - 2][0], 0))
+    coefs.append((0, table[size - 1][0] / table[size - 2][0]))
     return coefs
 
 
-def london_chain_fill(table, lambdas) -> pd.DataFrame:
+def london_chain_fill(table: pd.DataFrame, coefs: list) -> pd.DataFrame:
     """ fill triangle using london chain method """
     for i in range(1, len(table.columns)):
-        prevp, currp = table.loc[:, i-1], table.loc[:, i]
-        alpha, beta = lambdas[i - 1]
+        prevp, currp = table[i - 1], table[i]
+        alpha, beta = coefs[i - 1]
         currp[currp.isna()] = alpha + beta * prevp[currp.isna()]
     return table
 
@@ -135,9 +135,8 @@ if __name__ == "__main__":
         return filled
 
 
-    with pd.ExcelWriter(OUTPUT) as writer:
+    with pd.ExcelWriter(OUTPUT, datetime_format="YYYY") as writer:
         chain_ladder().to_excel(writer, sheet_name="chain_ladder")
         london_chain().to_excel(writer, sheet_name="london_chain")
         ratio_sinistre_prime().to_excel(writer, sheet_name="ratio SP")
-
         bornhuetter_ferguson().to_excel(writer, sheet_name="bf")
