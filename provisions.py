@@ -77,6 +77,12 @@ def bf_fill(table: pd.DataFrame, sp_ratio: float, primes: pd.Series, gammas: lis
 
 # -------------------------------------------------------------------------------
 
+def boni_mali(filled: pd.DataFrame) -> pd.DataFrame:
+    """ compute boni/mali """
+    last = filled.iloc[:, -3:-1]
+    filled["Cout total"] = last.iloc[:, -2] + last.iloc[:, -1]
+    filled["BM"] = filled["Cout total"].shift(periods=1) - filled["Cout total"]
+    return filled
 
 def provisions(table: pd.DataFrame) -> list:
     """ get expected provisions for filled table """
@@ -87,13 +93,12 @@ def provisions(table: pd.DataFrame) -> list:
         reserves.append(currl[size - 1] - currl[i])
     return reserves
 
-
 if __name__ == "__main__":
     OUTPUT = "actuariat.xls"
 
     def chain_ladder(data):
         """ ex3 """
-        lambdas = chain_ladder_lambdas(donnee.BDG)
+        lambdas = chain_ladder_lambdas(data)
         filled = chain_ladder_fill(data.copy(deep=True), lambdas)
         res = provisions(filled)
 
@@ -137,18 +142,13 @@ if __name__ == "__main__":
         return filled
 
 
-    # with pd.ExcelWriter(OUTPUT, datetime_format="YYYY") as writer:
-    #   chain_ladder(donnee.BDG).to_excel(writer, sheet_name="chain_ladder")
-    #   london_chain(donnee.BDG).to_excel(writer, sheet_name="london_chain")
-    #   ratio_sinistre_prime(
-    #           donnee.BDG, donnee.PRIMES["Prime"].values).to_excel(writer, sheet_name="ratio SP")
-    #   bornhuetter_ferguson(donnee.BDG).to_excel(writer, sheet_name="bf")
-
-    def boni_mali(filled):
-        """ compute boni/mali """
-        last = filled.iloc[:, -3:-1]
-        filled["Cout total"] = last.iloc[:, -2] + last.iloc[:, -1]
-        filled["BM"] = filled["Cout total"].shift(periods=1) - filled["Cout total"]
-        return filled
-    print(boni_mali(chain_ladder(donnee.BDG)))
-
+    with pd.ExcelWriter(OUTPUT, datetime_format="YYYY") as writer:
+        chain_ladder(donnee.CBDG).to_excel(writer, sheet_name="chain_ladder")
+        london_chain(donnee.CBDG).to_excel(writer, sheet_name="london_chain")
+        
+        ratio_sinistre_prime(
+                donnee.CBDG, donnee.PRIMES["Prime"].values).to_excel(writer, sheet_name="ratio SP")
+        boni_mali(chain_ladder(donnee.CBDG)).to_excel(writer, sheet_name="bonimali")
+        
+        chain_ladder(donnee.RBDG).to_excel(writer, sheet_name="reglement_chl")
+        bornhuetter_ferguson(donnee.RBDG).to_excel(writer, sheet_name="reglement_bf")
