@@ -47,7 +47,7 @@ PRIMES = pd.DataFrame({
 }).set_index("Annee", drop=True)
 
 ANNEE2017 = pd.DataFrame({
-    "Garantie": ["Incendie"] * 7,
+    "Garantie": ["BDG"] * 7,
     "Exercice": [pd.Timestamp(year=i, month=1, day=1) for i in range(2010, 2017)],
     "CNRU": [78738, 69630, 62561, 62607, 56345, 56047, 57809]
 })
