@@ -11,7 +11,7 @@ def chain_ladder_lambdas(table: pd.DataFrame) -> list:
     for i in range(len(table.columns) - 1):
         currp = table[i].dropna()
         nextp = table[i + 1].dropna()
-        lambdas.append(nextp.sum() / currp[: len(nextp)].sum())
+        lambdas.append(nextp.sum() / currp[:len(nextp)].sum())
     return lambdas
 
 
@@ -77,12 +77,9 @@ def bf_fill(table: pd.DataFrame, sp_ratio: float, primes: pd.Series, gammas: lis
 
 # -------------------------------------------------------------------------------
 
-def boni_mali(filled: pd.DataFrame) -> pd.DataFrame:
-    """ compute boni/mali """
-    last = filled.iloc[:, -3:-1]
-    filled["Cout total"] = last.iloc[:, -2] + last.iloc[:, -1]
-    filled["BM"] = filled["Cout total"].shift(periods=1) - filled["Cout total"]
-    return filled
+def boni_mali(charges: pd.Series) -> pd.DataFrame:
+    """ compute boni/mali for ultimate charges """
+    return charges.shift(periods=1) - charges
 
 def provisions(table: pd.DataFrame) -> list:
     """ get expected provisions for filled table """
@@ -94,8 +91,6 @@ def provisions(table: pd.DataFrame) -> list:
     return reserves
 
 if __name__ == "__main__":
-    OUTPUT = "actuariat.xls"
-
     def chain_ladder(data):
         """ ex3 """
         lambdas = chain_ladder_lambdas(data)
@@ -141,14 +136,17 @@ if __name__ == "__main__":
         print(filled)
         return filled
 
+    def write(output):
+        with pd.ExcelWriter(output, datetime_format="YYYY") as writer:
+            chain_ladder(donnee.CBDG).to_excel(writer, sheet_name="chain_ladder")
+            london_chain(donnee.CBDG).to_excel(writer, sheet_name="london_chain")
 
-    with pd.ExcelWriter(OUTPUT, datetime_format="YYYY") as writer:
-        chain_ladder(donnee.CBDG).to_excel(writer, sheet_name="chain_ladder")
-        london_chain(donnee.CBDG).to_excel(writer, sheet_name="london_chain")
-        
-        ratio_sinistre_prime(
-                donnee.CBDG, donnee.PRIMES["Prime"].values).to_excel(writer, sheet_name="ratio SP")
-        boni_mali(chain_ladder(donnee.CBDG)).to_excel(writer, sheet_name="bonimali")
-        
-        chain_ladder(donnee.RBDG).to_excel(writer, sheet_name="reglement_chl")
-        bornhuetter_ferguson(donnee.RBDG).to_excel(writer, sheet_name="reglement_bf")
+            ratio_sinistre_prime(
+                    donnee.CBDG, donnee.PRIMES["Prime"].values).to_excel(writer, sheet_name="ratio SP")
+            
+            donnee.ANNEE2017["BM"] = boni_mali(donnee.ANNEE2017["CNRU"])
+            donnee.ANNEE2017.to_excel(writer, sheet_name="boni_mali")
+
+            chain_ladder(donnee.RBDG).to_excel(writer, sheet_name="reglement_chl")
+            bornhuetter_ferguson(donnee.RBDG).to_excel(writer, sheet_name="reglement_bf")
+    write("actuariat.xls")
