@@ -27,9 +27,8 @@ def chain_ladder_fill(table: pd.DataFrame, lambdas: list) -> pd.DataFrame:
 def london_chain_coefs(table: pd.DataFrame) -> list:
     """ compute london chain regression coefficients """
     coefs = []
-    size = len(table.columns)
     # compute N-2 terms
-    for i in range(size - 2):
+    for i in range(len(table.columns) - 2):
         nextp = table[i + 1]
         currp = table[i].loc[nextp.notna()]  # mask the overlapping lines
         nextp.dropna(inplace=True)
@@ -41,7 +40,7 @@ def london_chain_coefs(table: pd.DataFrame) -> list:
     # compute N - 1
     # we set alpha = 0
     # so lambda = avg(S_n) / avg(S_n-1) = S_n / S_n-1 (single term in both)
-    coefs.append((0, table[size - 1][0] / table[size - 2][0]))
+    coefs.append((0, table.iloc[0, -1] / table.iloc[0, -2]))
     return coefs
 
 
@@ -92,22 +91,23 @@ def provisions(table: pd.DataFrame) -> list:
 if __name__ == "__main__":
     OUTPUT = "actuariat.xls"
 
-    def chain_ladder():
+    def chain_ladder(data):
         """ ex3 """
         lambdas = chain_ladder_lambdas(donnee.BDG)
-        filled = chain_ladder_fill(donnee.BDG.copy(deep=True), lambdas)
+        filled = chain_ladder_fill(data.copy(deep=True), lambdas)
         res = provisions(filled)
 
         filled["Provisions"] = res
         filled["Coefs"] = lambdas + [np.nan]
 
+        print("\nCHAIN LADDER:")
         print(filled)
         return filled
 
-    def london_chain():
+    def london_chain(data):
         """ ex3 """
-        lambdas = london_chain_coefs(donnee.BDG)
-        filled = london_chain_fill(donnee.BDG.copy(deep=True), lambdas)
+        lambdas = london_chain_coefs(data)
+        filled = london_chain_fill(data.copy(deep=True), lambdas)
         res = provisions(filled)
 
         filled["Provisions"] = res
@@ -115,28 +115,40 @@ if __name__ == "__main__":
         reprf = lambda t: (round(t[0], 4), round(t[1], 4))
         filled["Coefs"] = list(map(reprf, lambdas)) + [np.nan]
 
+        print("\nLONDON CHAIN:")
         print(filled)
         return filled
 
-    def ratio_sinistre_prime():
+    def ratio_sinistre_prime(data, primes):
         """ ex4 """
-        return chain_ladder().iloc[:, -3] / donnee.PRIMES["prime"].values
+        return (chain_ladder(data).iloc[:, :-2].T / primes).T
 
-    def bornhuetter_ferguson():
+    def bornhuetter_ferguson(data):
         """ ex7 """
-        gammas = bf_gammas(donnee.BDG)
-        filled = bf_fill(donnee.BDG.copy(deep=True), 0.97, donnee.PRIMES, gammas)
+        gammas = bf_gammas(data)
+        filled = bf_fill(data.copy(deep=True), 0.97, donnee.PRIMES, gammas)
         res = provisions(filled)
 
         filled["Provisions"] = res
         filled["Coefs"] = gammas
 
+        print("\nBornhuetter Ferguson:")
         print(filled)
         return filled
 
 
-    with pd.ExcelWriter(OUTPUT, datetime_format="YYYY") as writer:
-        chain_ladder().to_excel(writer, sheet_name="chain_ladder")
-        london_chain().to_excel(writer, sheet_name="london_chain")
-        ratio_sinistre_prime().to_excel(writer, sheet_name="ratio SP")
-        bornhuetter_ferguson().to_excel(writer, sheet_name="bf")
+    # with pd.ExcelWriter(OUTPUT, datetime_format="YYYY") as writer:
+    #   chain_ladder(donnee.BDG).to_excel(writer, sheet_name="chain_ladder")
+    #   london_chain(donnee.BDG).to_excel(writer, sheet_name="london_chain")
+    #   ratio_sinistre_prime(
+    #           donnee.BDG, donnee.PRIMES["Prime"].values).to_excel(writer, sheet_name="ratio SP")
+    #   bornhuetter_ferguson(donnee.BDG).to_excel(writer, sheet_name="bf")
+
+    def boni_mali(filled):
+        """ compute boni/mali """
+        last = filled.iloc[:, -3:-1]
+        filled["Cout total"] = last.iloc[:, -2] + last.iloc[:, -1]
+        filled["BM"] = filled["Cout total"].shift(periods=1) - filled["Cout total"]
+        return filled
+    print(boni_mali(chain_ladder(donnee.BDG)))
+

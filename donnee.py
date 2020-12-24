@@ -42,19 +42,18 @@ RBDG = pd.DataFrame({
 
 
 PRIMES = pd.DataFrame({
-    "annee": [2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016],
-    "prime": [50000, 60000, 55000, 50000, 50000, 45000, 47000, 48000, 50000, 54000, 55000, 56000,  53000,  55000, 56000],
-}).set_index("annee", drop=True)
-
+    "Annee": [pd.Timestamp(year=i, month=1, day=1) for i in range(2002, 2017)],
+    "Prime": [50000, 60000, 55000, 50000, 50000, 45000, 47000, 48000, 50000, 54000, 55000, 56000,  53000,  55000, 56000],
+}).set_index("Annee", drop=True)
 
 ANNEE2017 = pd.DataFrame({
-    "Garantie": ["Incendie","Incendie","Incendie","Incendie","Incendie","Incendie","Incendie"],
-    "Exercice": [pd.Timestamp("2010"), pd.Timestamp("2011"), pd.Timestamp("2012"), pd.Timestamp("2013"), pd.Timestamp("2014"), pd.Timestamp("2015"), pd.Timestamp("2016")],
+    "Garantie": ["Incendie"] * 7,
+    "Exercice": [pd.Timestamp(year=i, month=1, day=1) for i in range(2010, 2017)],
     "CNRU": [78738, 69630, 62561, 62607, 56345, 56047, 57809]
 })
 
 SINISTRES2018 = pd.DataFrame({
-    "Année de declaration": [2018] * 28,
-    "Année de survenance": [2017, 2016, 2016, 2015, 2014, 2014, 2015, 2015, 2015, 2016, 2016, 2016, 2016, 2016, 2016, 2016, 2015, 2015, 2015, 2014, 2013, 2016, 2016, 2016, 2017, 2017, 2017, 2017],
+    "Annee de declaration": [2018] * 28,
+    "Annee de survenance": [2017, 2016, 2016, 2015, 2014, 2014, 2015, 2015, 2015, 2016, 2016, 2016, 2016, 2016, 2016, 2016, 2015, 2015, 2015, 2014, 2013, 2016, 2016, 2016, 2017, 2017, 2017, 2017],
     "Reglements": [50000, 35000, 40000, 22000, 20000, 18000, 15000, 14000, 10000, 9000, 7000, 4000, 2000, 1000, 4000, 2000, 6000, 4500, 3000, 1000, 40000, 3000, 2000, 3000, 4500, 2500, 1500, 3000],
 })
